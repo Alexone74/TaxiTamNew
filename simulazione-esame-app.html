@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulazione d'Esame al Ruolo Conducenti</title>
+    <!-- Usiamo le CDN corrette che sappiamo funzionare -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.2/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-size: 16px;
+        }
+        @media (max-width: 640px) {
+            html {
+                font-size: 14px;
+            }
+        }
+        button {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Aggiungiamo un error boundary globale per catturare errori
+        window.addEventListener('error', function(e) {
+            console.error('Errore JavaScript catturato:', e);
+            document.getElementById('root').innerHTML = 
+                '<div style="padding: 20px; color: red; background-color: #ffeeee;">' +
+                '<h2>Si è verificato un errore JavaScript:</h2>' +
+                '<p>' + e.message + '</p>' +
+                '<p>File: ' + e.filename + '</p>' +
+                '<p>Linea: ' + e.lineno + '</p>' +
+                '</div>';
+            return true; // Impedisce il comportamento predefinito dell'errore
+        });
+        
+        // Componente ErrorBoundary
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error: error };
+            }
+
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div style={{padding: '20px', color: 'red', backgroundColor: '#ffeeee', margin: '20px'}}>
+                            <h2>Si è verificato un errore nel componente:</h2>
+                            <p>{this.state.error && this.state.error.toString()}</p>
+                        </div>
+                    );
+                }
+                return this.props.children; 
+            }
+        }
+        
+        try {
+            console.log("Inizializzazione Lucide Icons...");
+            const icons = lucide.createIcons({
+                icons: {
+                    BookOpen: lucide.icons.BookOpen,
+                    Home: lucide.icons.Home,
+                    Award: lucide.icons.Award,
+                    ArrowRight: lucide.icons.ArrowRight,
+                    Play: lucide.icons.Play,
+                    RefreshCw: lucide.icons.RefreshCw,
+                    CheckCircle: lucide.icons.CheckCircle,
+                    XCircle: lucide.icons.XCircle,
+                    LogIn: lucide.icons.LogIn,
+                    Lock: lucide.icons.Lock,
+                    LogOut: lucide.icons.LogOut,
+                    ChevronDown: lucide.icons.ChevronDown,
+                    ChevronUp: lucide.icons.ChevronUp,
+                    Globe: lucide.icons.Globe,
+                    AlertTriangle: lucide.icons.AlertTriangle,
+                    Info: lucide.icons.Info,
+                    Clock: lucide.icons.Clock
+                }
+            });
+            console.log("Lucide Icons inizializzato:", icons);
+        } catch (error) {
+            console.error("Errore durante l'inizializzazione di Lucide:", error);
+        }
+
+        function Icon({ name, ...props }) {
+            return <i data-lucide={name} {...props}></i>;
+        }
+		function SimulazioneEsame() {
+            const [screen, setScreen] = useState('login');
+            const [quizData, setQuizData] = useState(null);
+            const [simulazioneData, setSimulazioneData] = useState(null);
+            const [accessCodes, setAccessCodes] = useState(null);
+            const [error, setError] = useState(null);
+            const [examQuestions, setExamQuestions] = useState([]);
+            const [currentQuestion, setCurrentQuestion] = useState(0);
+            const [errors, setErrors] = useState({});
+            const [categoryCounts, setCategoryCounts] = useState({});
+            const [answerGiven, setAnswerGiven] = useState(false);
+            const [selectedLanguage, setSelectedLanguage] = useState(null);
+            const [selectedAnswer, setSelectedAnswer] = useState(null);
+            const [accessCode, setAccessCode] = useState('');
+            const [loginError, setLoginError] = useState('');
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [currentTime, setCurrentTime] = useState(0);
+            const [examStarted, setExamStarted] = useState(false);
+            const [timerInterval, setTimerInterval] = useState(null);
+            
+            // Funzione per creare hash SHA-256
+            const hashCode = (code) => {
+                return CryptoJS.SHA256(code).toString();
+            };
+            
+            // Verifica se un utente è già autenticato
+            useEffect(() => {
+                const savedAuth = localStorage.getItem('quiz_authenticated');
+                if (savedAuth === 'true') {
+                    setIsAuthenticated(true);
+                    setScreen('home');
+                }
+            }, []);
+
+            // Caricamento dei dati necessari
+            useEffect(() => {
+                if (isAuthenticated) {
+                    // Carica i dati del quiz
+                    console.log("Caricamento quiz.json...");
+                    fetch('quiz.json')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            console.log("quiz.json caricato con successo");
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Dati quiz parsati:", data);
+                            setQuizData(data);
+                            setError(null);
+                        })
+                        .catch(error => {
+                            console.error('Error loading quiz:', error);
+                            setError('Errore nel caricamento del quiz: ' + error.message);
+                        });
+
+                    // Carica i dati della simulazione
+                    console.log("Caricamento simulazione-esame.json...");
+                    fetch('simulazione-esame.json')
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            console.log("simulazione-esame.json caricato con successo");
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log("Dati simulazione parsati:", data);
+                            setSimulazioneData(data);
+                            setError(null);
+                        })
+                        .catch(error => {
+                            console.error('Error loading simulazione data:', error);
+                            setError('Errore nel caricamento della simulazione: ' + error.message);
+                        });
+                }
+            }, [isAuthenticated]);
+
+            // Carica i codici di accesso
+            useEffect(() => {
+                console.log("Caricamento access-codes.json...");
+                fetch('access-codes.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        console.log("access-codes.json caricato con successo");
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log("Codici di accesso parsati");
+                        setAccessCodes(data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading access codes:', error);
+                        setLoginError('Errore nel caricamento dei codici di accesso: ' + error.message);
+                    });
+            }, []);
+
+            const handleLogin = () => {
+                if (!accessCodes) {
+                    setLoginError('Errore nel caricamento dei codici di accesso. Riprova più tardi.');
+                    return;
+                }
+
+                setIsLoading(true);
+                
+                // Calcoliamo l'hash del codice inserito
+                const hashedInput = hashCode(accessCode);
+                console.log("Tentativo login con hash:", hashedInput);
+                
+                // Verifichiamo se l'hash corrisponde a uno dei codici salvati
+                if (accessCodes.codes.includes(hashedInput)) {
+                    console.log("Login valido");
+                    setIsAuthenticated(true);
+                    localStorage.setItem('quiz_authenticated', 'true');
+                    setScreen('home');
+                    setLoginError('');
+                } else {
+                    console.log("Login non valido");
+                    setLoginError('Codice di accesso non valido');
+                }
+                
+                setIsLoading(false);
+            };
+
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                localStorage.removeItem('quiz_authenticated');
+                setScreen('login');
+                setAccessCode('');
+            };
+
+            const startTimer = () => {
+                // Resetta il timer
+                setCurrentTime(0);
+                
+                // Ferma qualsiasi timer precedente
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                }
+                
+                // Avvia un nuovo timer
+                const interval = setInterval(() => {
+                    setCurrentTime(prevTime => prevTime + 1);
+                }, 1000);
+                
+                setTimerInterval(interval);
+                setExamStarted(true);
+            };
+
+            const stopTimer = () => {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    setTimerInterval(null);
+                }
+                setExamStarted(false);
+            };
+
+            // Formatta il tempo come mm:ss
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const secs = (seconds % 60).toString().padStart(2, '0');
+                return `${mins}:${secs}`;
+            };
+
+            const showLanguageScreen = () => {
+                setScreen('lingua');
+            };
+			const prepareExam = (language) => {
+                if (!quizData || !simulazioneData) return;
+                
+                // Prendi 4 domande casuali per ogni categoria richiesta
+                const selectedQuestions = [];
+                let tempCategoryCounts = {};
+                
+                simulazioneData.categorieRichieste.forEach(category => {
+                    let categoryName = typeof category === 'string' ? category : null;
+                    
+                    // Se è la categoria lingua, usa la lingua selezionata
+                    if (typeof category === 'object' && category.nome === 'Lingua') {
+                        categoryName = language;
+                        // Registra la lingua selezionata
+                        setSelectedLanguage(language);
+                    }
+                    
+                    if (categoryName) {
+                        // Filtra le domande per la categoria corrente
+                        const categoryQuestions = quizData.domande
+                            .filter(q => q.categoria === categoryName)
+                            .sort(() => Math.random() - 0.5) // mescoliamo le domande
+                            .slice(0, simulazioneData.numeroDomandePerCategoria); // prendiamo solo il numero richiesto
+                            
+                        selectedQuestions.push(...categoryQuestions);
+                        tempCategoryCounts[categoryName] = simulazioneData.numeroDomandePerCategoria;
+                    }
+                });
+                
+                // Mescoliamo tutte le domande per l'esame
+                const shuffledQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
+                
+                setExamQuestions(shuffledQuestions);
+                setCategoryCounts(tempCategoryCounts);
+                setCurrentQuestion(0);
+                setErrors({});
+                setAnswerGiven(false);
+                setSelectedAnswer(null);
+                
+                // Avvia il timer dell'esame
+                startTimer();
+                
+                setScreen('exam');
+            };
+
+            const checkAnswer = (selectedIndex) => {
+                if (answerGiven) return;
+
+                setAnswerGiven(true);
+                setSelectedAnswer(selectedIndex);
+                const currentQ = examQuestions[currentQuestion];
+
+                // Aggiorna gli errori se la risposta è sbagliata
+                if (selectedIndex !== currentQ.risposta_corretta) {
+                    setErrors(prev => {
+                        const category = currentQ.categoria;
+                        return {
+                            ...prev,
+                            [category]: (prev[category] || 0) + 1,
+                            total: (prev.total || 0) + 1
+                        };
+                    });
+                }
+            };
+
+            const nextQuestion = () => {
+                if (currentQuestion < examQuestions.length - 1) {
+                    setCurrentQuestion(prev => prev + 1);
+                    setAnswerGiven(false);
+                    setSelectedAnswer(null);
+                } else {
+                    // Ferma il timer
+                    stopTimer();
+                    setScreen('results');
+                }
+            };
+
+            const isExamPassed = () => {
+                if (!simulazioneData || !errors) return false;
+                
+                // Verifica che il numero totale di errori sia inferiore o uguale al massimo consentito
+                if ((errors.total || 0) > simulazioneData.maxErroriTotali) return false;
+                
+                // Verifica che per ogni categoria gli errori siano inferiori o uguali al massimo consentito
+                for (const category in errors) {
+                    if (category !== 'total' && errors[category] > simulazioneData.maxErroriPerCategoria) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            };
+
+            // Gestione del tasto Enter per il login
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    handleLogin();
+                }
+            };
+			// Schermata di login
+            if (screen === 'login') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-center">
+                                <img 
+                                    src="logo.png"
+                                    alt="TAM - Tassisti Artigiani Milanesi"
+                                    className="h-20 md:h-28"
+                                />
+                            </div>
+                            
+                            <div className="p-6 space-y-6">
+                                <div className="text-center space-y-2">
+                                    <Icon name="Lock" className="mx-auto text-indigo-600 w-12 h-12" />
+                                    <h2 className="text-2xl font-bold text-gray-800">Simulazione d'Esame</h2>
+                                    <p className="text-gray-600">Inserisci il tuo codice di accesso</p>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Codice di accesso
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={accessCode}
+                                            onChange={(e) => setAccessCode(e.target.value)}
+                                            onKeyPress={handleKeyPress}
+                                            placeholder="Inserisci il codice di accesso"
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                                            maxLength={15}
+                                        />
+                                    </div>
+                                    
+                                    {loginError && (
+                                        <div className="text-red-500 text-sm font-medium">{loginError}</div>
+                                    )}
+                                    
+                                    <button
+                                        onClick={handleLogin}
+                                        disabled={isLoading || accessCode.length < 3}
+                                        className={`w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl 
+                                                font-semibold transition-all duration-200 flex items-center justify-center gap-2
+                                                ${(isLoading || accessCode.length < 3) ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <Icon name="RefreshCw" className="w-5 h-5 animate-spin" />
+                                                Verifica in corso...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icon name="LogIn" className="w-5 h-5" />
+                                                Accedi
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (error) return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
+                    <div className="bg-white p-6 rounded-lg shadow-xl text-red-600">
+                        {error}
+                    </div>
+                </div>
+            );
+
+            if (!quizData || !simulazioneData) return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
+                    <div className="animate-pulse text-white text-xl flex items-center gap-2">
+                        <Icon name="RefreshCw" className="animate-spin" />
+                        Caricamento dati...
+                    </div>
+                </div>
+            );
+			// Schermata iniziale
+            if (screen === 'home') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-4 lg:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-between items-center">
+                                <img 
+                                    src="logo.png"
+                                    alt="TAM - Tassisti Artigiani Milanesi"
+                                    className="h-20 md:h-28"
+                                />
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-gray-500 hover:text-red-500 transition-colors flex items-center gap-1"
+                                    title="Esci"
+                                >
+                                    <span className="text-sm hidden sm:inline">Esci</span>
+                                    <Icon name="LogOut" className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                <div className="text-center">
+                                    <h1 className="text-2xl font-bold text-indigo-800 mb-2">Simulazione d'Esame</h1>
+                                    <p className="text-gray-600 mb-6">{simulazioneData.descrizione}</p>
+                                    
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3 text-left mb-6">
+                                        <Icon name="Info" className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <h3 className="font-semibold text-yellow-800">Informazioni sull'esame:</h3>
+                                            <ul className="text-yellow-700 text-sm space-y-1 mt-1">
+                                                <li>• {simulazioneData.numeroDomandePerCategoria} domande per ciascuna categoria</li>
+                                                <li>• Massimo {simulazioneData.maxErroriTotali} errori totali</li>
+                                                <li>• Massimo {simulazioneData.maxErroriPerCategoria} errori per singola categoria</li>
+                                                <li>• Le domande saranno presentate in ordine casuale</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={showLanguageScreen}
+                                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 
+                                                text-white p-4 rounded-xl font-semibold hover:opacity-90 
+                                                transition-all duration-200 flex items-center justify-center gap-2 mb-6"
+                                    >
+                                        <Icon name="Play" className="w-5 h-5" />
+                                        Avvia Simulazione d'Esame
+                                    </button>
+                                    
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4">
+                                        <p className="text-sm text-indigo-700">
+                                            Premi il pulsante sopra per iniziare la simulazione d'esame.
+                                            <br />Ti verrà chiesto di scegliere la lingua prima di cominciare.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Schermata di selezione lingua
+            if (screen === 'lingua') {
+                // Trova le lingue disponibili
+                const linguaCategory = simulazioneData.categorieRichieste.find(cat => typeof cat === 'object' && cat.nome === 'Lingua');
+                const lingueDisponibili = linguaCategory ? linguaCategory.scelta : [];
+
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-4 lg:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-between items-center">
+                                <img 
+                                    src="logo.png"
+                                    alt="TAM - Tassisti Artigiani Milanesi"
+                                    className="h-20 md:h-28"
+                                />
+                                <button
+                                    onClick={() => setScreen('home')}
+                                    className="text-gray-500 hover:text-red-500 transition-colors"
+                                    title="Torna indietro"
+                                >
+                                    <Icon name="Home" className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="p-6">
+                                <div className="text-center mb-6">
+                                    <h2 className="text-2xl font-bold text-indigo-800 mb-2">Scegli la lingua</h2>
+                                    <p className="text-gray-600">Seleziona la lingua per le domande dell'esame</p>
+                                </div>
+                                
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {lingueDisponibili.map((lingua) => (
+                                        <button
+                                            key={lingua}
+                                            onClick={() => prepareExam(lingua)}
+                                            className="p-4 bg-white border-2 border-indigo-200 hover:border-indigo-500 
+                                                    rounded-xl transition-all duration-200 text-lg font-medium
+                                                    flex items-center justify-center gap-2"
+                                        >
+                                            <Icon name="Globe" className="w-5 h-5 text-indigo-600" />
+                                            {lingua}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className="mt-6 p-4 bg-blue-50 rounded-lg text-blue-700 text-sm">
+                                    <p>
+                                        Nell'esame reale dovrai conoscere una delle lingue disponibili. 
+                                        Scegli quella che conosci meglio per la simulazione.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+			// Schermata dell'esame
+            if (screen === 'exam' && examQuestions.length > 0) {
+                const currentQ = examQuestions[currentQuestion];
+                
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-4 lg:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-indigo-800">Simulazione d'Esame</h2>
+                                
+                                <div className="flex items-center gap-6">
+                                    <div className="flex items-center bg-indigo-50 text-indigo-800 px-3 py-1.5 rounded-full">
+                                        <Icon name="Clock" className="w-4 h-4 mr-1.5" />
+                                        <span className="font-medium">{formatTime(currentTime)}</span>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Sei sicuro di voler interrompere l'esame? Tutti i progressi andranno persi.")) {
+                                                stopTimer();
+                                                setScreen('home');
+                                            }
+                                        }}
+                                        className="text-gray-500 hover:text-red-500 transition-colors"
+                                        title="Interrompi esame"
+                                    >
+                                        <Icon name="LogOut" className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="p-6">
+                                <div className="mb-6">
+                                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-500" 
+                                            style={{ width: `${((currentQuestion + 1) / examQuestions.length) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className="text-sm text-gray-600">
+                                            Domanda {currentQuestion + 1} di {examQuestions.length}
+                                        </span>
+                                        <span className="text-sm font-medium bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">
+                                            {currentQ.categoria}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div className="text-lg text-gray-800 mb-6 font-medium">
+                                    {currentQ.testo}
+                                </div>
+
+                                <div className="space-y-3">
+                                    {currentQ.opzioni.map((option, index) => {
+                                        const isCorrect = index === currentQ.risposta_corretta;
+                                        const isSelected = selectedAnswer === index;
+                                        let buttonStyle = "bg-white border-2 hover:border-indigo-300";
+                                        
+                                        if (answerGiven) {
+                                            if (isCorrect) {
+                                                buttonStyle = "bg-green-50 border-2 border-green-500";
+                                            } else if (isSelected) {
+                                                buttonStyle = "bg-red-50 border-2 border-red-500";
+                                            }
+                                        }
+
+                                        return (
+                                            <button
+                                                key={index}
+                                                onClick={() => checkAnswer(index)}
+                                                className={`w-full p-4 rounded-xl text-left transition-all duration-200 
+                                                        flex items-center justify-between group ${buttonStyle}`}
+                                                disabled={answerGiven}
+                                            >
+                                                <span className="flex-1">{option}</span>
+                                                {answerGiven && (isCorrect ? 
+                                                    <Icon name="CheckCircle" className="text-green-500 w-5 h-5" /> : 
+                                                    (isSelected && <Icon name="XCircle" className="text-red-500 w-5 h-5" />)
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {answerGiven && (
+                                    <button
+                                        onClick={nextQuestion}
+                                        className="w-full mt-6 bg-gradient-to-r from-blue-600 to-indigo-600 
+                                                text-white p-4 rounded-xl font-semibold hover:opacity-90 
+                                                transition-all duration-200 flex items-center justify-center gap-2"
+                                    >
+                                        {currentQuestion < examQuestions.length - 1 ? (
+                                            <>
+                                                Prossima domanda
+                                                <Icon name="ArrowRight" className="w-5 h-5" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                Concludi esame
+                                                <Icon name="Award" className="w-5 h-5" />
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+			// Schermata dei risultati
+            if (screen === 'results') {
+                const passed = isExamPassed();
+                const totalErrors = errors.total || 0;
+                const correctAnswers = examQuestions.length - totalErrors;
+                const errorsList = Object.entries(errors).filter(([key]) => key !== 'total');
+                
+                // Calcola la percentuale di risposte corrette
+                const correctPercentage = Math.round((correctAnswers / examQuestions.length) * 100);
+                
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-4 lg:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h2 className="text-xl font-bold text-indigo-800">Risultati Esame</h2>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-gray-500 mr-1">Tempo impiegato:</span>
+                                    <div className="flex items-center bg-indigo-50 text-indigo-800 px-3 py-1.5 rounded-full">
+                                        <Icon name="Clock" className="w-4 h-4 mr-1.5" />
+                                        <span className="font-medium">{formatTime(currentTime)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                <div className="text-center">
+								{passed ? (
+                                        <div className="mb-6">
+                                            <div className="w-20 h-20 bg-green-100 rounded-full mx-auto flex items-center justify-center">
+                                                <Icon name="CheckCircle" className="w-12 h-12 text-green-500" />
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-green-600 mt-4">Esame Superato!</h3>
+                                            <p className="text-gray-600">Complimenti, hai superato la simulazione d'esame!</p>
+                                        </div>
+                                    ) : (
+                                        <div className="mb-6">
+                                            <div className="w-20 h-20 bg-red-100 rounded-full mx-auto flex items-center justify-center">
+                                                <Icon name="XCircle" className="w-12 h-12 text-red-500" />
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-red-600 mt-4">Esame Non Superato</h3>
+                                            <p className="text-gray-600">Riprova la simulazione per migliorare le tue conoscenze.</p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+                                        <div className="text-5xl font-bold text-indigo-600 mb-2">{correctPercentage}%</div>
+                                        <p className="text-lg text-gray-700">
+                                            {correctAnswers} risposte corrette su {examQuestions.length}
+                                        </p>
+                                        <p className="text-gray-500 text-sm mt-1">
+                                            Hai commesso {totalErrors} errori su {examQuestions.length} domande
+                                        </p>
+                                    </div>
+									{errorsList.length > 0 && (
+                                        <div className="bg-red-50 border border-red-100 rounded-lg p-4 mb-6 text-left">
+                                            <h4 className="font-semibold text-red-700 mb-2">Errori per categoria:</h4>
+                                            <ul className="space-y-1 text-sm">
+                                                {errorsList.map(([category, count]) => (
+                                                    <li key={category} className="flex justify-between">
+                                                        <span className="text-gray-700">{category}:</span>
+                                                        <span className="font-medium text-red-600">{count} {count === 1 ? 'errore' : 'errori'}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            {!passed && (
+                                                <p className="mt-3 text-red-600 text-sm">
+                                                    <Icon name="AlertTriangle" className="inline-block w-4 h-4 mr-1" />
+                                                    Hai superato il limite di errori {passed ? 'in alcune categorie' : 'consentiti'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex flex-col space-y-3">
+                                        <button
+                                            onClick={() => window.location.href = 'index.html'}
+                                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl
+                                                    font-semibold hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+                                        >
+                                            <Icon name="Home" className="w-5 h-5" />
+                                            Torna alla Home
+                                        </button>
+                                        
+                                        <button
+                                            onClick={showLanguageScreen}
+                                            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl
+                                                    font-semibold hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2"
+                                        >
+                                            <Icon name="RefreshCw" className="w-5 h-5" />
+                                            Ricomincia la Simulazione
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+			// Renderizzazione predefinita (non dovrebbe mai essere raggiunta)
+            return null;
+        }
+
+        // Rendering con gestione errori
+        try {
+            console.log("Inizializzazione React...");
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            console.log("Root creato, rendering del componente principale...");
+            
+            root.render(
+                <ErrorBoundary>
+                    <SimulazioneEsame />
+                </ErrorBoundary>
+            );
+            
+            console.log("Rendering completato con successo.");
+        } catch (error) {
+            console.error("Errore durante l'inizializzazione di React:", error);
+            document.getElementById('root').innerHTML = 
+                '<div style="padding: 20px; color: red; background-color: #ffeeee;">' +
+                '<h2>Errore di inizializzazione React:</h2>' +
+                '<pre>' + error.toString() + '</pre>' +
+                '</div>';
+        }
+    </script>
+</body>
+</html>

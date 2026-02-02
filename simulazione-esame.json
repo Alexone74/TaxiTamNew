@@ -1,0 +1,16 @@
+{
+  "titolo": "Simulazione d'Esame al Ruolo Conducenti",
+  "descrizione": "La simulazione contiene 4 domande per ogni categoria principale. Si supera l'esame con un massimo di 4 errori totali, con non più di 2 errori per singola categoria.",
+  "categorieRichieste": [
+    "Geografia",
+    "Normativa Statale e Regionale", 
+    "Regolamento e Comportamento",
+    {
+      "nome": "Lingua",
+      "scelta": ["Inglese", "Francese", "Spagnolo", "Tedesco"]
+    }
+  ],
+  "maxErroriTotali": 4,
+  "maxErroriPerCategoria": 2,
+  "numeroDomandePerCategoria": 4
+}
