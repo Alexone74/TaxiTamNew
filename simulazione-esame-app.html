@@ -116,7 +116,8 @@
             const [answerGiven, setAnswerGiven] = useState(false);
             const [selectedLanguage, setSelectedLanguage] = useState(null);
             const [selectedAnswer, setSelectedAnswer] = useState(null);
-            const [accessCode, setAccessCode] = useState('');
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
             const [loginError, setLoginError] = useState('');
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [isLoading, setIsLoading] = useState(false);
@@ -131,7 +132,7 @@
             
             // Verifica se un utente è già autenticato
             useEffect(() => {
-                const savedAuth = localStorage.getItem('quizauthenticated');
+                const savedAuth = localStorage.getItem('quiz_authenticated');
                 if (savedAuth === 'true') {
                     setIsAuthenticated(true);
                     setScreen('home');
@@ -206,28 +207,36 @@
 
             const handleLogin = () => {
                 if (!accessCodes) {
-                    setLoginError('Errore nel caricamento dei codici di accesso. Riprova più tardi.');
+                    setLoginError("Errore nel caricamento degli utenti. Riprova più tardi.");
                     return;
                 }
-
                 setIsLoading(true);
-                
-                // Calcoliamo l'hash del codice inserito
-                const hashedInput = hashCode(accessCode);
-                console.log("Tentativo login con hash:", hashedInput);
-                
-                // Verifichiamo se l'hash corrisponde a uno dei codici salvati
-                if (accessCodes.codes.includes(hashedInput)) {
-                    console.log("Login valido");
+                setLoginError('');
+                const user = accessCodes.users?.find(u => 
+                    u.username && u.username.toLowerCase() === username.toLowerCase()
+                );
+                if (!user) {
+                    setLoginError("Utente non trovato.");
+                    setIsLoading(false);
+                    return;
+                }
+                if (user.active === false) {
+                    setLoginError("Utente disattivato. Contatta la scuola.");
+                    setIsLoading(false);
+                    return;
+                }
+                const hashedInput = CryptoJS.SHA256(password).toString();
+                if (hashedInput === user.passwordHash) {
+                    console.log('Login valido per utente:', user.username);
                     setIsAuthenticated(true);
-                    localStorage.setItem('quizauthenticated', 'true');
+                    localStorage.setItem('quiz_authenticated', 'true');
+                    localStorage.setItem('quizUser', JSON.stringify({ username: user.username }));
                     setScreen('home');
                     setLoginError('');
                 } else {
-                    console.log("Login non valido");
-                    setLoginError('Codice di accesso non valido');
+                    console.log('Password non valida per utente:', user.username);
+                    setLoginError("Password non valida.");
                 }
-                
                 setIsLoading(false);
             };
 
@@ -391,7 +400,7 @@
                                 <div className="text-center space-y-2">
                                     <Icon name="Lock" className="mx-auto text-indigo-600 w-12 h-12" />
                                     <h2 className="text-2xl font-bold text-gray-800">Simulazione d'Esame</h2>
-                                    <p className="text-gray-600">Inserisci il tuo codice di accesso</p>
+                                    <p className="text-gray-600">Inserisci le tue credenziali</p>
                                 </div>
                                 
                                 <div className="space-y-4">
@@ -416,7 +425,7 @@
                                     
                                     <button
                                         onClick={handleLogin}
-                                        disabled={isLoading || accessCode.length < 3}
+                                        disabled={isLoading || !username || !password}
                                         className={`w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-xl 
                                                 font-semibold transition-all duration-200 flex items-center justify-center gap-2
                                                 ${(isLoading || accessCode.length < 3) ? 'opacity-70 cursor-not-allowed' : 'hover:opacity-90'}`}
