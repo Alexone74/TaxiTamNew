@@ -116,7 +116,6 @@
             const [answerGiven, setAnswerGiven] = useState(false);
             const [selectedLanguage, setSelectedLanguage] = useState(null);
             const [selectedAnswer, setSelectedAnswer] = useState(null);
-            const [accessCode, setAccessCode] = useState('');
             const [loginError, setLoginError] = useState('');
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [isLoading, setIsLoading] = useState(false);
@@ -204,33 +203,7 @@
                     });
             }, []);
 
-            const handleLogin = () => {
-                if (!accessCodes) {
-                    setLoginError('Errore nel caricamento dei codici di accesso. Riprova più tardi.');
-                    return;
-                }
-
-                setIsLoading(true);
-                
-                // Calcoliamo l'hash del codice inserito
-                const hashedInput = hashCode(accessCode);
-                console.log("Tentativo login con hash:", hashedInput);
-                
-                // Verifichiamo se l'hash corrisponde a uno dei codici salvati
-                if (accessCodes.codes.includes(hashedInput)) {
-                    console.log("Login valido");
-                    setIsAuthenticated(true);
-                    localStorage.setItem('quiz_authenticated', 'true');
-                    setScreen('home');
-                    setLoginError('');
-                } else {
-                    console.log("Login non valido");
-                    setLoginError('Codice di accesso non valido');
-                }
-                
-                setIsLoading(false);
-            };
-
+            
             const handleLogout = () => {
                 setIsAuthenticated(false);
                 localStorage.removeItem('quiz_authenticated');
@@ -367,24 +340,7 @@
                 return true;
             };
 
-            // Gestione del tasto Enter per il login
-            const handleKeyPress = (e) => {
-                if (e.key === 'Enter') {
-                    handleLogin();
-                }
-            };
-			// Schermata di login
-            if (screen === 'login') {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center p-4">
-                        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
-                            <div className="bg-white/90 p-6 border-b border-gray-100 flex justify-center">
-                                <img 
-                                    src="logo.png"
-                                    alt="TAM - Tassisti Artigiani Milanesi"
-                                    className="h-20 md:h-28"
-                                />
-                            </div>
+            			
                             
                             <div className="p-6 space-y-6">
                                 <div className="text-center space-y-2">
