@@ -1,14 +1,19 @@
 {
   "users": [
     {
-      "username": "studente1",
+      "username": "alexone74@gmail.com",
+      "passwordHash": "7a3180ba33c911df44691db25e5e2c83c5cb0a8d16655291345b8accbddf863d",
+      "active": true
+    },
+    {
+      "username": "info@tam.it",
       "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
       "active": true
     },
     {
-      "username": "studente2",
-      "passwordHash": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
-      "active": false
+      "username": "alexface@gmail.com",
+      "passwordHash": "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f",
+      "active": true
     }
   ]
 }
