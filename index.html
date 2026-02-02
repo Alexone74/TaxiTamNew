@@ -133,10 +133,6 @@
                 if (savedAuth === 'true') {
                     setIsAuthenticated(true);
                     setScreen('home');
-                    const savedUser = localStorage.getItem('quizUser');
-    const savedPass = localStorage.getItem('quizPassword');
-    if (savedUser) setUsername(savedUser);
-    if (savedPass) setPassword(savedPass);
                 }
             }, []);
 
@@ -219,9 +215,7 @@
   if (hashedInput === user.passwordHash) {
     console.log("Login valido per utente:", user.username);
     setIsAuthenticated(true);
-    localStorage.setItem('quizUser', username);
-     localStorage.setItem('quizPassword', password);
-    localStorage.setItem("quizauthenticated", "true");
+    localStorage.setItem("quiz_authenticated", "true");
     localStorage.setItem(
       "quizUser",
       JSON.stringify({ username: user.username })
@@ -241,8 +235,6 @@
                 localStorage.removeItem('quiz_authenticated');
                 setScreen('login');
                 setAccessCode('');
-                localStorage.removeItem('quizUser');
-localStorage.removeItem('quizPassword');
             };
 
             const toggleCategory = (categoryName) => {
